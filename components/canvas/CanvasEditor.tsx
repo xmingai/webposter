@@ -13,19 +13,56 @@ export default function CanvasEditor() {
   const containerRef = useRef<HTMLDivElement>(null);
   const { zoom, setSelectedObject, setZoom, pushHistory } = useCanvasStore();
 
-  // Initialize canvas
+  // Initialize canvas — infinite canvas with dot grid
   useEffect(() => {
     if (!canvasRef.current || fabricRef.current) return;
 
     const canvas = new Canvas(canvasRef.current, {
-      backgroundColor: '#f0f0f0',
+      backgroundColor: '#1a1a2e',
       selection: true,
       preserveObjectStacking: true,
     });
 
     fabricRef.current = canvas;
 
-    // Resize handler
+    // ─── Dot grid background ───
+    const drawGrid = () => {
+      const ctx = canvas.getContext();
+      const zoom = canvas.getZoom();
+      const vpt = canvas.viewportTransform!;
+      const w = canvas.getWidth();
+      const h = canvas.getHeight();
+
+      const gridSize = 30;
+      const dotRadius = Math.max(0.6, 1 * zoom);
+
+      // Calculate the visible area in canvas coordinates
+      const startX = -vpt[4] / zoom;
+      const startY = -vpt[5] / zoom;
+      const endX = startX + w / zoom;
+      const endY = startY + h / zoom;
+
+      // Snap to grid
+      const firstX = Math.floor(startX / gridSize) * gridSize;
+      const firstY = Math.floor(startY / gridSize) * gridSize;
+
+      ctx.save();
+      ctx.transform(vpt[0], vpt[1], vpt[2], vpt[3], vpt[4], vpt[5]);
+
+      for (let x = firstX; x < endX; x += gridSize) {
+        for (let y = firstY; y < endY; y += gridSize) {
+          ctx.beginPath();
+          ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.08)';
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    };
+
+    canvas.on('after:render', drawGrid);
+
+    // ─── Resize handler ───
     const resizeCanvas = () => {
       if (!containerRef.current) return;
       const { width, height } = containerRef.current.getBoundingClientRect();
@@ -36,7 +73,58 @@ export default function CanvasEditor() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Selection events
+    // ─── Panning (Space + Drag or Middle Mouse) ───
+    let isPanning = false;
+    let spaceDown = false;
+    let lastPanPos = { x: 0, y: 0 };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !spaceDown) {
+        spaceDown = true;
+        canvas.defaultCursor = 'grab';
+        canvas.selection = false;
+        e.preventDefault();
+      }
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spaceDown = false;
+        isPanning = false;
+        canvas.defaultCursor = 'default';
+        canvas.selection = true;
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+
+    canvas.on('mouse:down', (opt) => {
+      const me = opt.e as MouseEvent;
+      if (spaceDown || me.button === 1) {
+        isPanning = true;
+        lastPanPos = { x: me.clientX, y: me.clientY };
+        canvas.defaultCursor = 'grabbing';
+        me.preventDefault();
+      }
+    });
+
+    canvas.on('mouse:move', (opt) => {
+      if (!isPanning) return;
+      const me = opt.e as MouseEvent;
+      const vpt = canvas.viewportTransform!;
+      vpt[4] += me.clientX - lastPanPos.x;
+      vpt[5] += me.clientY - lastPanPos.y;
+      lastPanPos = { x: me.clientX, y: me.clientY };
+      canvas.requestRenderAll();
+    });
+
+    canvas.on('mouse:up', () => {
+      if (isPanning) {
+        isPanning = false;
+        canvas.defaultCursor = spaceDown ? 'grab' : 'default';
+      }
+    });
+
+    // ─── Selection events ───
     canvas.on('selection:created', (e) => {
       const obj = e.selected?.[0];
       if (obj) setSelectedObject((obj as any).id || null);
@@ -51,37 +139,22 @@ export default function CanvasEditor() {
       setSelectedObject(null);
     });
 
-    // Save history on object modification
+    // ─── History ───
     canvas.on('object:modified', () => {
       pushHistory(JSON.stringify(canvas.toObject(['id'])));
     });
 
-    // Zoom with mouse wheel
+    // ─── Zoom (scroll wheel) ───
     canvas.on('mouse:wheel', (opt) => {
       const delta = opt.e.deltaY;
       let newZoom = canvas.getZoom() * (delta > 0 ? 0.95 : 1.05);
-      newZoom = Math.min(Math.max(newZoom, 0.1), 5);
+      newZoom = Math.min(Math.max(newZoom, 0.05), 10);
       canvas.zoomToPoint(new Point(opt.e.offsetX, opt.e.offsetY), newZoom);
       setZoom(Math.round(newZoom * 100));
       opt.e.preventDefault();
       opt.e.stopPropagation();
     });
 
-    // Add a default white artboard
-    const artboard = new Rect({
-      left: 100,
-      top: 60,
-      width: 800,
-      height: 600,
-      fill: '#ffffff',
-      shadow: new Shadow({ color: 'rgba(0,0,0,0.12)', blur: 24, offsetX: 0, offsetY: 4 }),
-      selectable: false,
-      evented: false,
-      rx: 4,
-      ry: 4,
-    });
-    (artboard as any).id = 'artboard';
-    canvas.add(artboard);
     canvas.renderAll();
 
     // Save initial state
@@ -89,6 +162,8 @@ export default function CanvasEditor() {
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
       canvas.dispose();
       fabricRef.current = null;
     };
@@ -169,7 +244,7 @@ export default function CanvasEditor() {
 
     const active = canvas.getActiveObjects();
     active.forEach((obj) => {
-      if ((obj as any).id !== 'artboard') canvas.remove(obj);
+      canvas.remove(obj);
     });
     canvas.discardActiveObject();
     canvas.renderAll();

@@ -213,6 +213,20 @@ body {
   justify-content: space-between;
   padding: 0 12px;
   gap: 8px;
+  position: relative;
+}
+
+.tool-group.ai-tools {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.tool-group.ai-tools.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .tool-group {

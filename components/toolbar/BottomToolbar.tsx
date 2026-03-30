@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useCanvasStore } from '@/stores/canvasStore';
 
-const tools = [
+const aiTools = [
   { id: 'removeBg', icon: ImageOff, label: 'Remove BG' },
   { id: 'upscale', icon: Maximize, label: 'Upscale' },
   { id: 'eraser', icon: Eraser, label: 'Eraser' },
@@ -26,7 +26,8 @@ const tools = [
 ];
 
 export default function BottomToolbar() {
-  const { zoom, setZoom } = useCanvasStore();
+  const { zoom, setZoom, selectedObjectId } = useCanvasStore();
+  const hasSelection = selectedObjectId !== null;
 
   const handleToolClick = (id: string) => {
     if (id === 'removeBg') {
@@ -77,9 +78,9 @@ export default function BottomToolbar() {
 
   return (
     <div className="bottom-toolbar">
-      {/* Left: AI Tools */}
-      <div className="tool-group">
-        {tools.map(({ id, icon: Icon, label }) => (
+      {/* Left: AI Tools — only visible when an object is selected */}
+      <div className={`tool-group ai-tools ${hasSelection ? 'visible' : ''}`}>
+        {aiTools.map(({ id, icon: Icon, label }) => (
           <button key={id} className="tb-btn" onClick={() => handleToolClick(id)} title={label}>
             <Icon size={16} />
             <span>{label}</span>
