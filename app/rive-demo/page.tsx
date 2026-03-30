@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
-type Emotion = 'happy' | 'angry' | 'sad' | 'surprised' | 'laughing';
+type Emotion = 'happy' | 'angry' | 'sad' | 'surprised' | 'laughing' | 'super_happy';
 
-const EMOTIONS: { id: Emotion; emoji: string; label: string }[] = [
-  { id: 'happy', emoji: '😊', label: '开心' },
-  { id: 'laughing', emoji: '🤭', label: '傻笑' },
-  { id: 'surprised', emoji: '😲', label: '惊讶' },
-  { id: 'sad', emoji: '😢', label: '难过' },
-  { id: 'angry', emoji: '😤', label: '生气' },
+const EMOTIONS: { id: Emotion; emoji: string; label: string; color: string }[] = [
+  { id: 'happy', emoji: '🌟', label: '开心', color: '#4ade80' },
+  { id: 'super_happy', emoji: '❤️', label: '超赞', color: '#f87171' },
+  { id: 'laughing', emoji: '😂', label: '大笑', color: '#fbbf24' },
+  { id: 'surprised', emoji: '😲', label: '惊讶', color: '#60a5fa' },
+  { id: 'sad', emoji: '😢', label: '委屈', color: '#a78bfa' },
+  { id: 'angry', emoji: '🔥', label: '暴怒', color: '#f87171' },
 ];
 
 export default function RiveDemoPage() {
@@ -18,15 +19,15 @@ export default function RiveDemoPage() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [isHovered, setIsHovered] = useState(false);
   const [isBlinking, setIsBlinking] = useState(false);
-  const [headBob, setHeadBob] = useState(0);
+  const [time, setTime] = useState(0);
 
-  // Track mouse position (normalized 0-1)
+  // Track mouse position with smoothing
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     setMousePos({
-      x: Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height)),
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height,
     });
   }, []);
 
@@ -35,444 +36,356 @@ export default function RiveDemoPage() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [handleMouseMove]);
 
-  // Auto-blink every 2-5 seconds
-  useEffect(() => {
-    const blink = () => {
-      setIsBlinking(true);
-      setTimeout(() => setIsBlinking(false), 150);
-    };
-    const interval = setInterval(blink, 2000 + Math.random() * 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Head bobbing animation
+  // Main animation loop
   useEffect(() => {
     let frame: number;
-    let t = 0;
     const animate = () => {
-      t += 0.03;
-      setHeadBob(Math.sin(t) * 2);
+      setTime(t => t + 0.05);
       frame = requestAnimationFrame(animate);
     };
     frame = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frame);
   }, []);
 
-  // When hovered, switch to laughing
+  // Auto-blink
+  useEffect(() => {
+    const blink = () => {
+      setIsBlinking(true);
+      setTimeout(() => setIsBlinking(false), 120);
+    };
+    const interval = setInterval(blink, 3000 + Math.random() * 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Auto-emotion on hover
   useEffect(() => {
     if (isHovered) {
       setEmotion('laughing');
     } else {
-      setEmotion('happy');
+       // Keep manual selection if not hovered
     }
   }, [isHovered]);
 
-  // Eye tracking - calculate pupil offset
-  const eyeOffsetX = (mousePos.x - 0.5) * 8;
-  const eyeOffsetY = (mousePos.y - 0.5) * 5;
-  const headTilt = (mousePos.x - 0.5) * 15; // head tilts toward mouse
+  // Animation values
+  const bounce = useMemo(() => Math.sin(time) * 5, [time]);
+  const squash = useMemo(() => 1 + Math.sin(time) * 0.03, [time]);
+  const stretch = useMemo(() => 1 - Math.sin(time) * 0.03, [time]);
+  
+  const eyeOffsetX = (mousePos.x - 0.5) * 12;
+  const eyeOffsetY = (mousePos.y - 0.5) * 8;
+  const headTilt = (mousePos.x - 0.5) * 20;
 
-  // Emotion-specific modifiers
-  const getEyeShape = () => {
-    if (isBlinking) return { scaleY: 0.1, eyebrowY: 0 };
-    switch (emotion) {
-      case 'happy':
-      case 'laughing':
-        return { scaleY: 1, eyebrowY: 0 };
-      case 'angry':
-        return { scaleY: 0.7, eyebrowY: 4 };
-      case 'sad':
-        return { scaleY: 0.8, eyebrowY: -3 };
-      case 'surprised':
-        return { scaleY: 1.3, eyebrowY: -5 };
-      default:
-        return { scaleY: 1, eyebrowY: 0 };
+  // Render helper for floating particles
+  const particles = useMemo(() => {
+    if (emotion === 'super_happy') {
+      return Array.from({ length: 5 }).map((_, i) => ({
+        id: i,
+        x: 200 + Math.sin(time + i) * 80,
+        y: 150 + Math.cos(time * 0.5 + i) * 40 - (time * 20 % 100),
+        scale: 0.5 + Math.random() * 0.5,
+        opacity: 1 - ((time * 20 % 100) / 100)
+      }));
     }
-  };
-
-  const getBeakOpen = () => {
-    switch (emotion) {
-      case 'laughing': return 6;
-      case 'surprised': return 8;
-      case 'angry': return 3;
-      default: return 0;
+    if (emotion === 'angry') {
+        return Array.from({ length: 3 }).map((_, i) => ({
+            id: i,
+            x: 200 + (i - 1) * 60 + Math.sin(time * 10) * 2,
+            y: 100 - (time * 30 % 50),
+            scale: 0.8,
+            opacity: 1 - ((time * 30 % 50) / 50)
+        }));
     }
-  };
-
-  const getCheekBlush = () => {
-    return emotion === 'happy' || emotion === 'laughing';
-  };
-
-  const eyeShape = getEyeShape();
-  const beakOpen = getBeakOpen();
-  const showBlush = getCheekBlush();
-
-  // Laughing wobble
-  const laughWobble = emotion === 'laughing' ? Math.sin(Date.now() / 80) * 3 : 0;
+    return [];
+  }, [emotion, time]);
 
   return (
-    <div ref={containerRef} className="rive-demo-page">
-      <div className="demo-header">
-        <h1>🦜 小太阳鹦鹉 — Rive 动画 Demo</h1>
-        <p>把鼠标移到鹦鹉身上，它会傻笑并转头看向你</p>
+    <div ref={containerRef} className="gamified-stage">
+      <div className="ui-header">
+        <h1>SUN CONURE <span>PRO</span></h1>
+        <div className="status-pill">LEVEL 99 PET</div>
       </div>
 
-      <div className="parrot-stage">
+      <div className="character-container">
+        {/* Floor Shadow */}
+        <div 
+          className="floor-shadow" 
+          style={{ 
+            transform: `scale(${1 + bounce * 0.02})`,
+            opacity: 0.3 - bounce * 0.01
+          }} 
+        />
+
         <svg
           viewBox="0 0 400 500"
-          className="parrot-svg"
+          className="parrot-hero"
           onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onMouseLeave={() => {
+            setIsHovered(false);
+            setEmotion('happy');
+          }}
         >
-          {/* ═══ Background glow ═══ */}
           <defs>
-            <radialGradient id="bodyGrad" cx="50%" cy="40%" r="50%">
-              <stop offset="0%" stopColor="#FFD700" />
-              <stop offset="60%" stopColor="#FFA500" />
-              <stop offset="100%" stopColor="#FF8C00" />
-            </radialGradient>
-            <radialGradient id="bellyGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FFED4A" />
-              <stop offset="100%" stopColor="#FFD700" />
-            </radialGradient>
-            <radialGradient id="cheekGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="rgba(255,100,100,0.6)" />
-              <stop offset="100%" stopColor="rgba(255,100,100,0)" />
-            </radialGradient>
-            <filter id="shadow">
-              <feDropShadow dx="0" dy="8" stdDeviation="12" floodColor="rgba(0,0,0,0.3)" />
+            {/* Rich Gradients */}
+            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFE14D" />
+              <stop offset="100%" stopColor="#FFB800" />
+            </linearGradient>
+            <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#FFB800" />
+              <stop offset="100%" stopColor="#FF8A00" />
+            </linearGradient>
+            <linearGradient id="wingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#4ADE80" />
+              <stop offset="100%" stopColor="#22C55E" />
+            </linearGradient>
+            <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="10" stdDeviation="10" floodOpacity="0.2" />
             </filter>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="20" result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            <filter id="innerGlow">
+                <feFlood floodColor="white" floodOpacity="0.3" result="flood" />
+                <feComposite in="flood" in2="SourceGraphic" operator="in" result="mask" />
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
             </filter>
           </defs>
 
-          {/* ═══ Ambient glow ═══ */}
-          <ellipse cx="200" cy="380" rx="120" ry="30" fill="rgba(255,165,0,0.1)" />
+          {/* Particles */}
+          {particles.map(p => (
+            <text 
+              key={p.id} 
+              x={p.x} 
+              y={p.y} 
+              fontSize={24} 
+              style={{ opacity: p.opacity, transform: `scale(${p.scale})` }}
+            >
+              {emotion === 'super_happy' ? '❤️' : '💢'}
+            </text>
+          ))}
 
-          <g
-            transform={`translate(200, 250) rotate(${headTilt + laughWobble}) translate(-200, ${-250 + headBob})`}
-            style={{ transition: 'transform 0.15s ease-out' }}
-            filter="url(#shadow)"
-          >
-            {/* ═══ Tail feathers ═══ */}
-            <g>
-              <ellipse cx="200" cy="420" rx="25" ry="60" fill="#2E8B57" transform="rotate(-10, 200, 420)" />
-              <ellipse cx="200" cy="420" rx="22" ry="55" fill="#3CB371" transform="rotate(5, 200, 420)" />
-              <ellipse cx="200" cy="420" rx="20" ry="50" fill="#228B22" transform="rotate(-3, 200, 420)" />
-            </g>
-
-            {/* ═══ Wings ═══ */}
-            <ellipse cx="140" cy="280" rx="45" ry="80" fill="#2E8B57"
-              transform={`rotate(${15 + (emotion === 'surprised' ? -10 : 0)}, 140, 280)`}
-              style={{ transition: 'transform 0.3s ease' }}
-            />
-            <ellipse cx="260" cy="280" rx="45" ry="80" fill="#2E8B57"
-              transform={`rotate(${-15 + (emotion === 'surprised' ? 10 : 0)}, 260, 280)`}
-              style={{ transition: 'transform 0.3s ease' }}
-            />
-            {/* Wing detail */}
-            <ellipse cx="138" cy="285" rx="35" ry="65" fill="#3CB371"
-              transform={`rotate(${15 + (emotion === 'surprised' ? -10 : 0)}, 138, 285)`}
-            />
-            <ellipse cx="262" cy="285" rx="35" ry="65" fill="#3CB371"
-              transform={`rotate(${-15 + (emotion === 'surprised' ? 10 : 0)}, 262, 285)`}
-            />
-
-            {/* ═══ Body ═══ */}
-            <ellipse cx="200" cy="290" rx="75" ry="100" fill="url(#bodyGrad)" />
-
-            {/* ═══ Belly ═══ */}
-            <ellipse cx="200" cy="310" rx="50" ry="65" fill="url(#bellyGrad)" />
-
-            {/* ═══ Feet ═══ */}
-            <g>
-              <ellipse cx="175" cy="385" rx="15" ry="8" fill="#888" />
-              <ellipse cx="225" cy="385" rx="15" ry="8" fill="#888" />
-              {/* Toes */}
-              <circle cx="163" cy="388" r="4" fill="#777" />
-              <circle cx="175" cy="390" r="4" fill="#777" />
-              <circle cx="187" cy="388" r="4" fill="#777" />
-              <circle cx="213" cy="388" r="4" fill="#777" />
-              <circle cx="225" cy="390" r="4" fill="#777" />
-              <circle cx="237" cy="388" r="4" fill="#777" />
-            </g>
-
-            {/* ═══ Head ═══ */}
-            <circle cx="200" cy="180" r="65" fill="#FFD700" />
-
-            {/* ═══ Face orange patch ═══ */}
-            <ellipse cx="200" cy="195" rx="50" ry="40" fill="#FF8C00" opacity="0.5" />
-
-            {/* ═══ Crown feathers / crest ═══ */}
-            <ellipse cx="185" cy="120" rx="12" ry="20" fill="#FFD700" transform="rotate(-15, 185, 120)" />
-            <ellipse cx="200" cy="115" rx="10" ry="22" fill="#FFED4A" />
-            <ellipse cx="215" cy="120" rx="12" ry="20" fill="#FFD700" transform="rotate(15, 215, 120)" />
-
-            {/* ═══ Eyes ═══ */}
-            <g transform={`translate(0, ${eyeShape.eyebrowY * 0.3})`}>
-              {/* Left eye white */}
-              <ellipse cx={170 + eyeOffsetX * 0.3} cy="175" rx="18" ry={18 * eyeShape.scaleY}
-                fill="white" stroke="#333" strokeWidth="1.5"
-                style={{ transition: 'ry 0.12s ease' }}
+          <g transform={`translate(200, 400) scale(${stretch}, ${squash}) translate(-200, -400)`}>
+            <g 
+                transform={`translate(200, 250) rotate(${headTilt + (emotion === 'angry' ? Math.sin(time*20)*2 : 0)}) translate(-200, ${-250 + bounce})`}
+                style={{ transition: 'transform 0.1s cubic-bezier(0.2, 0, 0.2, 1)' }}
+            >
+              {/* Tail */}
+              <path d="M 180,350 Q 200,450 220,350" fill="#22C55E" filter="url(#softShadow)" />
+              
+              {/* Wings */}
+              <ellipse 
+                cx="120" cy="280" rx="35" ry="60" fill="url(#wingGrad)" 
+                transform={`rotate(${headTilt * -0.5 + (emotion === 'surprised' ? -20 : 0)})`} 
               />
-              {/* Left pupil */}
-              <circle cx={170 + eyeOffsetX} cy={175 + eyeOffsetY} r="9"
-                fill="#1a1a1a"
-                style={{ transition: 'cx 0.1s ease, cy 0.1s ease' }}
+              <ellipse 
+                cx="280" cy="280" rx="35" ry="60" fill="url(#wingGrad)" 
+                transform={`rotate(${headTilt * -0.5 + (emotion === 'surprised' ? 20 : 0)})`} 
               />
-              {/* Left eye highlight */}
-              <circle cx={166 + eyeOffsetX * 0.7} cy={171 + eyeOffsetY * 0.5} r="3.5" fill="white" />
 
-              {/* Right eye white */}
-              <ellipse cx={230 + eyeOffsetX * 0.3} cy="175" rx="18" ry={18 * eyeShape.scaleY}
-                fill="white" stroke="#333" strokeWidth="1.5"
-                style={{ transition: 'ry 0.12s ease' }}
-              />
-              {/* Right pupil */}
-              <circle cx={230 + eyeOffsetX} cy={175 + eyeOffsetY} r="9"
-                fill="#1a1a1a"
-                style={{ transition: 'cx 0.1s ease, cy 0.1s ease' }}
-              />
-              {/* Right eye highlight */}
-              <circle cx={226 + eyeOffsetX * 0.7} cy={171 + eyeOffsetY * 0.5} r="3.5" fill="white" />
-            </g>
+              {/* Body */}
+              <rect x="130" y="200" width="140" height="160" rx="70" fill="url(#bodyGrad)" filter="url(#softShadow)" />
+              <ellipse cx="200" cy="300" rx="45" ry="55" fill="#FFE14D" opacity="0.6" />
 
-            {/* ═══ Eyebrows ═══ */}
-            {emotion === 'angry' && (
-              <g>
-                <line x1="155" y1="160" x2="180" y2="155" stroke="#5a3e00" strokeWidth="3" strokeLinecap="round" />
-                <line x1="245" y1="160" x2="220" y2="155" stroke="#5a3e00" strokeWidth="3" strokeLinecap="round" />
+              {/* Head */}
+              <circle cx="200" cy="180" r="75" fill="url(#goldGrad)" />
+              
+              {/* Crest - 3 Juicy Feathers */}
+              <g transform="translate(200, 110)">
+                <path d="M -15,0 Q -25,-40 0,-50 Q 10,-40 0,0" fill="#FFE14D" transform={`rotate(${-15 + headTilt * 0.2})`} />
+                <path d="M 0,0 Q 0,-60 15,-55 Q 20,-40 0,0" fill="#FFB800" transform={`rotate(${headTilt * 0.2})`} />
+                <path d="M 15,0 Q 25,-40 10,-50 Q 0,-40 15,0" fill="#FFE14D" transform={`rotate(${15 + headTilt * 0.2})`} />
               </g>
-            )}
-            {emotion === 'sad' && (
-              <g>
-                <line x1="155" y1="155" x2="180" y2="160" stroke="#5a3e00" strokeWidth="2.5" strokeLinecap="round" />
-                <line x1="245" y1="155" x2="220" y2="160" stroke="#5a3e00" strokeWidth="2.5" strokeLinecap="round" />
-              </g>
-            )}
 
-            {/* ═══ Cheek blush ═══ */}
-            {showBlush && (
-              <g style={{ transition: 'opacity 0.3s' }}>
-                <ellipse cx="148" cy="195" rx="16" ry="10" fill="url(#cheekGrad)" />
-                <ellipse cx="252" cy="195" rx="16" ry="10" fill="url(#cheekGrad)" />
+              {/* Eyes - Large and Expressive */}
+              <g transform={`translate(${eyeOffsetX}, ${eyeOffsetY})`}>
+                {/* Whites */}
+                <circle cx="160" cy="170" r="22" fill="white" stroke="#442200" strokeWidth="2" />
+                <circle cx="240" cy="170" r="22" fill="white" stroke="#442200" strokeWidth="2" />
+                
+                {/* Pupils */}
+                <g style={{ transition: 'transform 0.1s ease-out' }}>
+                   {isBlinking ? (
+                     <g>
+                       <line x1="145" y1="170" x2="175" y2="170" stroke="#442200" strokeWidth="4" strokeLinecap="round" />
+                       <line x1="225" y1="170" x2="255" y2="170" stroke="#442200" strokeWidth="4" strokeLinecap="round" />
+                     </g>
+                   ) : (
+                     <g>
+                        {emotion === 'angry' ? (
+                            <path d="M 145,175 Q 160,160 175,175" fill="none" stroke="#442200" strokeWidth="4" />
+                        ) : emotion === 'laughing' ? (
+                            <path d="M 145,170 Q 160,185 175,170" fill="none" stroke="#442200" strokeWidth="4" />
+                        ) : (
+                            <>
+                                <circle cx="160" cy="170" r="10" fill="#442200" />
+                                <circle cx="240" cy="170" r="10" fill="#442200" />
+                                <circle cx="156" cy="166" r="4" fill="white" />
+                                <circle cx="236" cy="166" r="4" fill="white" />
+                            </>
+                        )}
+                        {emotion === 'laughing' && <path d="M 225,170 Q 240,185 255,170" fill="none" stroke="#442200" strokeWidth="4" />}
+                     </g>
+                   )}
+                </g>
               </g>
-            )}
 
-            {/* ═══ Beak ═══ */}
-            <g>
-              {/* Upper beak */}
-              <path
-                d="M 188,200 Q 200,195 212,200 Q 206,215 200,218 Q 194,215 188,200 Z"
-                fill="#444"
-                stroke="#333"
-                strokeWidth="1"
-              />
-              {/* Lower beak — opens based on emotion */}
-              <path
-                d={`M 192,${205 + beakOpen * 0.3} Q 200,${215 + beakOpen} 208,${205 + beakOpen * 0.3}`}
-                fill="#555"
-                stroke="#444"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                style={{ transition: 'd 0.2s ease' }}
-              />
-              {/* Mouth interior when open */}
-              {beakOpen > 3 && (
-                <ellipse cx="200" cy={212 + beakOpen * 0.5} rx={6} ry={beakOpen * 0.4}
-                  fill="#c0392b" opacity="0.7"
-                />
+              {/* Beak */}
+              <g transform="translate(200, 205)">
+                <path d="M -15,0 Q 0,-5 15,0 Q 10,25 0,30 Q -10,25 -15,0" fill="#442200" />
+                {emotion === 'laughing' && <ellipse cx="0" cy="15" rx="8" ry="5" fill="#FF5C00" />}
+              </g>
+
+              {/* Blush */}
+              {(emotion === 'happy' || emotion === 'super_happy' || emotion === 'laughing') && (
+                <g opacity="0.4">
+                    <circle cx="135" cy="195" r="12" fill="#FF5C00" />
+                    <circle cx="265" cy="195" r="12" fill="#FF5C00" />
+                </g>
               )}
             </g>
-
-            {/* ═══ Sad tear ═══ */}
-            {emotion === 'sad' && (
-              <g>
-                <ellipse cx="170" cy="198" rx="3" ry="5" fill="rgba(100,180,255,0.7)">
-                  <animate attributeName="cy" values="198;210;198" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.7;0;0.7" dur="2s" repeatCount="indefinite" />
-                </ellipse>
-              </g>
-            )}
-
-            {/* ═══ Angry steam puffs ═══ */}
-            {emotion === 'angry' && (
-              <g>
-                <circle cx="145" cy="140" r="6" fill="rgba(255,255,255,0.4)">
-                  <animate attributeName="cy" values="140;125;140" dur="1s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.4;0;0.4" dur="1s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="255" cy="140" r="6" fill="rgba(255,255,255,0.4)">
-                  <animate attributeName="cy" values="140;125;140" dur="1.2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.4;0;0.4" dur="1.2s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="150" cy="130" r="4" fill="rgba(255,255,255,0.3)">
-                  <animate attributeName="cy" values="130;115;130" dur="0.9s" repeatCount="indefinite" />
-                </circle>
-                <circle cx="250" cy="130" r="4" fill="rgba(255,255,255,0.3)">
-                  <animate attributeName="cy" values="130;115;130" dur="1.1s" repeatCount="indefinite" />
-                </circle>
-              </g>
-            )}
-
-            {/* ═══ Laughing lines ═══ */}
-            {emotion === 'laughing' && (
-              <g opacity="0.4">
-                <path d="M 148,190 Q 143,195 148,200" stroke="#5a3e00" strokeWidth="1.5" fill="none" />
-                <path d="M 252,190 Q 257,195 252,200" stroke="#5a3e00" strokeWidth="1.5" fill="none" />
-              </g>
-            )}
           </g>
         </svg>
-
-        {/* Emotion label */}
-        <div className="emotion-badge">
-          {EMOTIONS.find(e => e.id === emotion)?.emoji}{' '}
-          {EMOTIONS.find(e => e.id === emotion)?.label}
-        </div>
       </div>
 
-      {/* Emotion buttons */}
-      <div className="emotion-controls">
-        {EMOTIONS.map(({ id, emoji, label }) => (
+      <div className="game-controls">
+        {EMOTIONS.map((emp) => (
           <button
-            key={id}
-            className={`emotion-btn ${emotion === id ? 'active' : ''}`}
-            onClick={() => setEmotion(id)}
-            onMouseEnter={() => setIsHovered(false)}
+            key={emp.id}
+            className={`game-btn ${emotion === emp.id ? 'active' : ''}`}
+            onClick={() => setEmotion(emp.id)}
+            style={{ 
+                '--btn-color': emp.color,
+                transform: emotion === emp.id ? 'scale(1.1)' : 'scale(1)'
+            } as any}
           >
-            <span className="emotion-emoji">{emoji}</span>
-            <span className="emotion-label">{label}</span>
+            <span className="btn-icon">{emp.emoji}</span>
+            <span className="btn-text">{emp.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="demo-footer">
-        <p>💡 鼠标悬停在鹦鹉上 → 傻笑转头 &nbsp;|&nbsp; 点击下方按钮切换表情 &nbsp;|&nbsp; 移动鼠标 → 眼睛跟踪</p>
-      </div>
-
-      <style>{`
-        .rive-demo-page {
+      <style jsx>{`
+        .gamified-stage {
           min-height: 100vh;
-          background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+          background: radial-gradient(circle at center, #2d1b4d 0%, #151025 100%);
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          padding: 20px;
-          font-family: -apple-system, 'Segoe UI', sans-serif;
-          color: #e0e0e0;
+          padding: 40px;
+          color: white;
+          font-family: 'Inter', sans-serif;
           overflow: hidden;
         }
 
-        .demo-header {
+        .ui-header {
           text-align: center;
-          margin-bottom: 10px;
+          margin-bottom: 20px;
         }
 
-        .demo-header h1 {
-          font-size: 28px;
-          font-weight: 700;
-          background: linear-gradient(90deg, #FFD700, #FF8C00, #FFD700);
+        .ui-header h1 {
+          font-size: 42px;
+          font-weight: 900;
+          letter-spacing: -2px;
+          margin: 0;
+          background: linear-gradient(to bottom, #fff 40%, #888 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
-          background-clip: text;
-          margin: 0 0 6px;
         }
 
-        .demo-header p {
-          font-size: 14px;
-          color: #999;
-          margin: 0;
+        .ui-header h1 span {
+          color: #fbbf24;
+          -webkit-text-fill-color: #fbbf24;
+          font-size: 24px;
+          vertical-align: top;
+          margin-left: 4px;
         }
 
-        .parrot-stage {
+        .status-pill {
+          background: rgba(251, 191, 36, 0.2);
+          border: 1px solid #fbbf24;
+          color: #fbbf24;
+          padding: 4px 12px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 800;
+          display: inline-block;
+          margin-top: 8px;
+        }
+
+        .character-container {
           position: relative;
-          width: 360px;
-          height: 420px;
+          width: 400px;
+          height: 400px;
           display: flex;
           align-items: center;
           justify-content: center;
         }
 
-        .parrot-svg {
+        .parrot-hero {
           width: 100%;
           height: 100%;
-          cursor: pointer;
-          filter: drop-shadow(0 0 40px rgba(255, 165, 0, 0.15));
-          transition: filter 0.3s;
+          z-index: 2;
+          cursor: crosshair;
         }
 
-        .parrot-svg:hover {
-          filter: drop-shadow(0 0 60px rgba(255, 165, 0, 0.3));
-        }
-
-        .emotion-badge {
+        .floor-shadow {
           position: absolute;
-          top: 10px;
-          right: 10px;
-          background: rgba(0,0,0,0.5);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          padding: 6px 14px;
-          border-radius: 20px;
-          font-size: 14px;
-          border: 1px solid rgba(255,255,255,0.1);
+          bottom: 20%;
+          width: 160px;
+          height: 40px;
+          background: black;
+          border-radius: 50%;
+          filter: blur(15px);
+          z-index: 1;
         }
 
-        .emotion-controls {
-          display: flex;
-          gap: 10px;
-          margin-top: 10px;
+        .game-controls {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 12px;
+          margin-top: 40px;
+          width: 100%;
+          max-width: 400px;
         }
 
-        .emotion-btn {
+        .game-btn {
+          background: #251a3d;
+          border: 2px solid rgba(255, 255, 255, 0.1);
+          border-bottom-width: 6px;
+          border-radius: 16px;
+          padding: 16px;
+          cursor: pointer;
+          transition: all 0.1s;
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 4px;
-          padding: 12px 18px;
-          border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(255,255,255,0.05);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border-radius: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-          color: #ccc;
+          color: #fff;
         }
 
-        .emotion-btn:hover {
-          background: rgba(255,255,255,0.12);
-          border-color: rgba(255,255,255,0.2);
+        .game-btn:hover {
+          background: #2d214d;
           transform: translateY(-2px);
         }
 
-        .emotion-btn.active {
-          background: rgba(255,165,0,0.15);
-          border-color: #FF8C00;
-          color: #FFD700;
+        .game-btn:active {
+          transform: translateY(2px);
+          border-bottom-width: 2px;
+          margin-top: 4px;
         }
 
-        .emotion-emoji {
-          font-size: 26px;
+        .game-btn.active {
+          border-color: var(--btn-color);
+          background: rgba(255, 255, 255, 0.05);
         }
 
-        .emotion-label {
-          font-size: 12px;
+        .btn-icon {
+          font-size: 24px;
         }
 
-        .demo-footer {
-          margin-top: 16px;
-          text-align: center;
-        }
-
-        .demo-footer p {
-          font-size: 12px;
-          color: #666;
-          margin: 0;
+        .btn-text {
+          font-size: 13px;
+          font-weight: 700;
+          opacity: 0.8;
         }
       `}</style>
     </div>
