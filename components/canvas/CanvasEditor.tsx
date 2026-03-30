@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { Canvas, FabricImage, Textbox, Rect, FabricObject } from 'fabric';
+import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow } from 'fabric';
 import { useCanvasStore } from '@/stores/canvasStore';
 
 // Register custom attributes for serialization
@@ -53,7 +53,7 @@ export default function CanvasEditor() {
 
     // Save history on object modification
     canvas.on('object:modified', () => {
-      pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+      pushHistory(JSON.stringify(canvas.toObject(['id'])));
     });
 
     // Zoom with mouse wheel
@@ -61,7 +61,7 @@ export default function CanvasEditor() {
       const delta = opt.e.deltaY;
       let newZoom = canvas.getZoom() * (delta > 0 ? 0.95 : 1.05);
       newZoom = Math.min(Math.max(newZoom, 0.1), 5);
-      canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, newZoom);
+      canvas.zoomToPoint(new Point(opt.e.offsetX, opt.e.offsetY), newZoom);
       setZoom(Math.round(newZoom * 100));
       opt.e.preventDefault();
       opt.e.stopPropagation();
@@ -74,7 +74,7 @@ export default function CanvasEditor() {
       width: 800,
       height: 600,
       fill: '#ffffff',
-      shadow: '0 4px 24px rgba(0,0,0,0.12)',
+      shadow: new Shadow({ color: 'rgba(0,0,0,0.12)', blur: 24, offsetX: 0, offsetY: 4 }),
       selectable: false,
       evented: false,
       rx: 4,
@@ -85,7 +85,7 @@ export default function CanvasEditor() {
     canvas.renderAll();
 
     // Save initial state
-    pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+    pushHistory(JSON.stringify(canvas.toObject(['id'])));
 
     return () => {
       window.removeEventListener('resize', resizeCanvas);
@@ -116,7 +116,7 @@ export default function CanvasEditor() {
     canvas.add(img);
     canvas.setActiveObject(img);
     canvas.renderAll();
-    pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+    pushHistory(JSON.stringify(canvas.toObject(['id'])));
   }, [pushHistory]);
 
   const addText = useCallback((text: string = 'Double click to edit') => {
@@ -137,7 +137,7 @@ export default function CanvasEditor() {
     canvas.add(textbox);
     canvas.setActiveObject(textbox);
     canvas.renderAll();
-    pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+    pushHistory(JSON.stringify(canvas.toObject(['id'])));
   }, [pushHistory]);
 
   const addShape = useCallback(() => {
@@ -160,7 +160,7 @@ export default function CanvasEditor() {
     canvas.add(rect);
     canvas.setActiveObject(rect);
     canvas.renderAll();
-    pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+    pushHistory(JSON.stringify(canvas.toObject(['id'])));
   }, [pushHistory]);
 
   const deleteSelected = useCallback(() => {
@@ -173,7 +173,7 @@ export default function CanvasEditor() {
     });
     canvas.discardActiveObject();
     canvas.renderAll();
-    pushHistory(JSON.stringify(canvas.toJSON(['id'])));
+    pushHistory(JSON.stringify(canvas.toObject(['id'])));
   }, [pushHistory]);
 
   const exportCanvas = useCallback(() => {
