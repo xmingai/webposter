@@ -18,7 +18,7 @@ export default function CanvasEditor() {
     if (!canvasRef.current || fabricRef.current) return;
 
     const canvas = new Canvas(canvasRef.current, {
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#2a2a2a',
       selection: true,
       preserveObjectStacking: true,
     });
@@ -53,7 +53,7 @@ export default function CanvasEditor() {
         for (let y = firstY; y < endY; y += gridSize) {
           ctx.beginPath();
           ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255,255,255,0.08)';
+          ctx.fillStyle = 'rgba(255,255,255,0.06)';
           ctx.fill();
         }
       }
