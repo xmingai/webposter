@@ -1,0 +1,12 @@
+const { Canvas, Rect, ActiveSelection, Group } = require('fabric');
+const c = new Canvas();
+const r1 = new Rect({ left: 10, top: 10, width: 20, height: 20 });
+const r2 = new Rect({ left: 50, top: 50, width: 20, height: 20 });
+c.add(r1, r2);
+c.setActiveObject(new ActiveSelection([r1, r2], { canvas: c }));
+const act = c.getActiveObject();
+console.log(act.type);
+const g = new Group(act.removeAll());
+c.add(g);
+c.setActiveObject(g);
+console.log(g.type);

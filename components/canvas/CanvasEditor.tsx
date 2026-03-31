@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow, Polygon, Polyline } from 'fabric';
+import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow, Polygon, Polyline, Group, ActiveSelection } from 'fabric';
 import { useCanvasStore } from '@/stores/canvasStore';
 import { initAligningGuidelines } from '@/utils/aligningGuidelines';
 
@@ -400,6 +400,52 @@ export default function CanvasEditor() {
           fabricRef.current.loadFromJSON(state).then(() => {
             fabricRef.current?.renderAll();
           });
+        }
+      }
+
+      // Group / Ungroup
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
+        e.preventDefault();
+        const canvas = fabricRef.current;
+        if (!canvas) return;
+
+        const activeObj = canvas.getActiveObject();
+        if (!activeObj) return;
+
+        if (e.shiftKey) {
+          // Ungroup
+          if (activeObj.type === 'Group' || activeObj.type === 'group') {
+            const group = activeObj as Group;
+            const items = group.removeAll();
+            canvas.remove(group);
+            items.forEach((item) => canvas.add(item));
+            
+            const sel = new ActiveSelection(items, { canvas });
+            canvas.setActiveObject(sel);
+            canvas.requestRenderAll();
+            useCanvasStore.getState().pushHistory(JSON.stringify(canvas.toObject(['id'])));
+          }
+        } else {
+          // Group
+          if (activeObj.type === 'ActiveSelection' || activeObj.type === 'activeSelection') {
+            const sel = activeObj as ActiveSelection;
+            const items = sel.removeAll();
+            const group = new Group(items, {
+              left: sel.left,
+              top: sel.top,
+              width: sel.width,
+              height: sel.height,
+              scaleX: sel.scaleX,
+              scaleY: sel.scaleY,
+              originX: sel.originX,
+              originY: sel.originY,
+              angle: sel.angle,
+            });
+            canvas.add(group);
+            canvas.setActiveObject(group);
+            canvas.requestRenderAll();
+            useCanvasStore.getState().pushHistory(JSON.stringify(canvas.toObject(['id'])));
+          }
         }
       }
     };
