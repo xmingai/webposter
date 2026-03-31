@@ -414,11 +414,10 @@ export default function CanvasEditor() {
         if (!activeObj) return;
 
         if (e.shiftKey) {
-          // Ungroup
-          if (activeObj.type === 'Group' || activeObj.type === 'group') {
-            const group = activeObj as Group;
-            const items = group.removeAll();
-            canvas.remove(group);
+          // Ungroup — use instanceof for reliable detection
+          if (activeObj instanceof Group && !(activeObj instanceof ActiveSelection)) {
+            const items = activeObj.removeAll();
+            canvas.remove(activeObj);
             items.forEach((item) => canvas.add(item));
             
             const sel = new ActiveSelection(items, { canvas });
@@ -427,21 +426,10 @@ export default function CanvasEditor() {
             useCanvasStore.getState().pushHistory(JSON.stringify(canvas.toObject(['id'])));
           }
         } else {
-          // Group
-          if (activeObj.type === 'ActiveSelection' || activeObj.type === 'activeSelection') {
-            const sel = activeObj as ActiveSelection;
-            const items = sel.removeAll();
-            const group = new Group(items, {
-              left: sel.left,
-              top: sel.top,
-              width: sel.width,
-              height: sel.height,
-              scaleX: sel.scaleX,
-              scaleY: sel.scaleY,
-              originX: sel.originX,
-              originY: sel.originY,
-              angle: sel.angle,
-            });
+          // Group — use instanceof for reliable detection
+          if (activeObj instanceof ActiveSelection) {
+            const items = activeObj.removeAll();
+            const group = new Group(items);
             canvas.add(group);
             canvas.setActiveObject(group);
             canvas.requestRenderAll();
