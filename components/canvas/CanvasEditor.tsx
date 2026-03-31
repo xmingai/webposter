@@ -406,6 +406,7 @@ export default function CanvasEditor() {
       // Group / Ungroup
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
         e.preventDefault();
+        e.stopPropagation();
         const canvas = fabricRef.current;
         if (!canvas) return;
 
@@ -449,8 +450,8 @@ export default function CanvasEditor() {
         }
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener('keydown', handler, true);
+    return () => window.removeEventListener('keydown', handler, true);
   }, [deleteSelected]);
 
   return (
