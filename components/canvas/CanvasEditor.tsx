@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useCallback } from 'react';
-import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow } from 'fabric';
+import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow, Polygon, Polyline } from 'fabric';
 import { useCanvasStore } from '@/stores/canvasStore';
 
 // Register custom attributes for serialization
@@ -11,7 +11,91 @@ export default function CanvasEditor() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const { zoom, setSelectedObject, setZoom, pushHistory } = useCanvasStore();
+  const { zoom, setSelectedObject, setZoom, pushHistory, activeTool, setTool } = useCanvasStore();
+
+  // Lasso Tool Effect
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+
+    if (activeTool === 'lasso') {
+      canvas.selection = false;
+      canvas.defaultCursor = 'crosshair';
+      canvas.discardActiveObject();
+      canvas.requestRenderAll();
+
+      let isDrawing = false;
+      let points: Point[] = [];
+      let drawingPolyline: Polyline | null = null;
+
+      const onMouseDown = (opt: any) => {
+        isDrawing = true;
+        const pointer = opt.scenePoint;
+        points = [pointer];
+        drawingPolyline = new Polyline(points, {
+          fill: 'transparent',
+          stroke: '#6366f1',
+          strokeWidth: 2,
+          strokeDashArray: [5, 5],
+          selectable: false,
+          evented: false,
+          objectCaching: false,
+        });
+        canvas.add(drawingPolyline);
+      };
+
+      const onMouseMove = (opt: any) => {
+        if (!isDrawing || !drawingPolyline) return;
+        const pointer = opt.scenePoint;
+        points.push(pointer);
+        
+        drawingPolyline.set({ points: [...points] });
+        canvas.requestRenderAll();
+      };
+
+      const onMouseUp = () => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        if (drawingPolyline) {
+          canvas.remove(drawingPolyline);
+        }
+        
+        if (points.length > 2) {
+          const finalPolygon = new Polygon(points, {
+            fill: 'rgba(99, 102, 241, 0.3)',
+            stroke: '#6366f1',
+            strokeWidth: 2,
+            selectable: true,
+            evented: true,
+            cornerStyle: 'circle',
+            transparentCorners: false,
+          });
+          (finalPolygon as any).id = `mask_${Date.now()}`;
+          canvas.add(finalPolygon);
+          canvas.setActiveObject(finalPolygon);
+          canvas.requestRenderAll();
+          pushHistory(JSON.stringify(canvas.toObject(['id'])));
+        }
+        setTool('select');
+      };
+
+      canvas.on('mouse:down', onMouseDown);
+      canvas.on('mouse:move', onMouseMove);
+      canvas.on('mouse:up', onMouseUp);
+
+      return () => {
+        canvas.selection = true;
+        canvas.defaultCursor = 'default';
+        canvas.off('mouse:down', onMouseDown);
+        canvas.off('mouse:move', onMouseMove);
+        canvas.off('mouse:up', onMouseUp);
+        if (drawingPolyline) {
+          canvas.remove(drawingPolyline);
+          canvas.requestRenderAll();
+        }
+      };
+    }
+  }, [activeTool, setTool, pushHistory]);
 
   // Initialize canvas — infinite canvas with dot grid
   useEffect(() => {
@@ -322,7 +406,6 @@ export default function CanvasEditor() {
   return (
     <div ref={containerRef} className="canvas-editor-container">
       <canvas ref={canvasRef} />
-      <div className="zoom-indicator">{zoom}%</div>
     </div>
   );
 }
