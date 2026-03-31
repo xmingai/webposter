@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { Canvas, FabricImage, Textbox, Rect, FabricObject, Point, Shadow, Polygon, Polyline } from 'fabric';
 import { useCanvasStore } from '@/stores/canvasStore';
+import { initAligningGuidelines } from '@/utils/aligningGuidelines';
 
 // Register custom attributes for serialization
 FabricObject.customProperties = ['id'];
@@ -108,6 +109,9 @@ export default function CanvasEditor() {
     });
 
     fabricRef.current = canvas;
+
+    // Initialize smart guides (snapping)
+    initAligningGuidelines(canvas);
 
     // ─── Dot grid background ───
     const drawGrid = () => {
