@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type Tool = 'select' | 'text' | 'shape' | 'upload' | 'removeBg' | 'upscale' | 'eraser' | 'lasso';
+export type Tool = 'select' | 'text' | 'shape' | 'upload' | 'removeBg' | 'upscale' | 'eraser' | 'lasso' | 'featureCallout';
 
 interface CanvasState {
   activeTool: Tool;

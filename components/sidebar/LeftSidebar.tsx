@@ -1,6 +1,9 @@
 'use client';
 
-import { MousePointer2, Type, Square, Upload, ImageIcon, Layers, Sparkles, Lasso } from 'lucide-react';
+import { MousePointer2, Type, Square, Upload, ImageIcon, Layers, Sparkles, Lasso, Tag } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const FeatureCalloutPanel = dynamic(() => import('@/components/feature-callout/FeatureCalloutPanel'), { ssr: false });
 import { useCanvasStore, Tool } from '@/stores/canvasStore';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -10,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 const sidebarItems: { id: Tool | string; icon: React.ElementType; label: string; special?: boolean }[] = [
   { id: 'select', icon: MousePointer2, label: '选择' },
   { id: 'lasso', icon: Lasso, label: '局部重绘' },
+  { id: 'featureCallout', icon: Tag, label: 'AI 卖点图', special: true },
   { id: 'upload', icon: Upload, label: '上传图片' },
   { id: 'text', icon: Type, label: '编辑文本' },
   { id: 'shape', icon: Square, label: '基础图形' },
@@ -86,6 +90,13 @@ export default function LeftSidebar() {
           })}
         </div>
       </ScrollArea>
+
+      {/* Feature Callout Panel (条件渲染) */}
+      {activeTool === 'featureCallout' && (
+        <div className="absolute left-full top-0 bottom-0 w-[320px] border-r bg-card/95 backdrop-blur-xl z-20 overflow-y-auto shadow-xl">
+          <FeatureCalloutPanel />
+        </div>
+      )}
 
       <Separator />
 
